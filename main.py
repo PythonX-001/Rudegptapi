@@ -103,6 +103,12 @@ def get_system_prompt(rage_level, current_mood, conversation_count):
         )
     }
 
+
+@app.route('/')
+def index():
+    return '<h1>hi bro</h1>'
+
+
 @app.route("/api/chat", methods=["POST"])
 def chat():
     data = request.json
