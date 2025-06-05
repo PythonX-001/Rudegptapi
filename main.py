@@ -65,60 +65,56 @@ def chat():
 
     # Send to OpenRouter
     # Try multiple API keys on failure
-    try:
-        response = requests.post(
-            OPENROUTER_API_URL,
-            headers={"Authorization": f"Bearer {OPENROUTER_API_KEY_2}"},
-            json={
-                "model": "microsoft/mai-ds-r1:free",
-                "messages": messages,
-                "temperature": 0.8
-            }
-        )
-        response.raise_for_status()
-        assistant_content = response.json()['choices'][0]['message']['content']
-        
-        # Try to parse JSON response
+    api_keys = [
+        "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",#working
+        "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",
+        "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",
+        "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",
+        "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"#working
+    ]
+
+    for key in api_keys:
         try:
-            # Clean the response in case there's extra text
+            response = requests.post(
+                OPENROUTER_API_URL,
+                headers={"Authorization": f"Bearer {key}"},
+                json={
+                    "model": "microsoft/mai-ds-r1:free",
+                    "messages": messages,
+                    "temperature": 0.8
+                },
+                timeout=10
+            )
+            response.raise_for_status()
+            assistant_content = response.json()['choices'][0]['message']['content']
+
+            # Try to parse JSON response
             json_match = re.search(r'\{.*\}', assistant_content, re.DOTALL)
             if json_match:
                 json_str = json_match.group()
                 ai_response = json.loads(json_str)
-                
-                # Validate required fields
-                if not all(key in ai_response for key in ['response', 'rageIncrease', 'newMood']):
+
+                if not all(k in ai_response for k in ['response', 'rageIncrease', 'newMood']):
                     raise ValueError("Missing required fields")
-                
-                # Ensure action is properly set
+
                 if 'action' not in ai_response:
                     ai_response['action'] = None
-                    
+
                 return jsonify(ai_response)
             else:
                 raise ValueError("No JSON found in response")
-                
-        except (json.JSONDecodeError, ValueError) as e:
-            # Fallback response if AI doesn't return proper JSON
-            fallback_rage = min(15, max(5, len(user_message) // 10))
-            fallback_response = {
-                "response": assistant_content if len(assistant_content) < 200 else "Your question broke my brain. Congratulations on achieving new levels of stupidity.",
-                "rageIncrease": fallback_rage,
-                "newMood": "Mood: Error 404: Patience Not Found",
-                "action": "kick" if rage_level >= 90 else None
-            }
-            return jsonify(fallback_response)
 
-    except Exception as e:
-        # Error fallback
-        error_response = {
-            "response": f"Great, now you broke the API too. Error: Something went wrong, probably your fault.",
-            "rageIncrease": 20,
-            "newMood": "Mood: Critically Sarcastic",
-            "action": None
-        }
-        return jsonify(error_response)
+        except (requests.RequestException, json.JSONDecodeError, ValueError) as e:
+            continue  # Try next API key
 
+    # If all keys fail
+    error_response = {
+        "response": "Fantastic. You managed to break all my connections. Happy now?",
+        "rageIncrease": 20,
+        "newMood": "Mood: Critically Sarcastic",
+        "action": "kick" if rage_level >= 90 else None
+    }
+    return jsonify(error_response)
 
 
 if __name__ == "__main__":
